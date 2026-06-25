@@ -101,9 +101,14 @@ Next.js (App Router) · React · TypeScript · `@react-pdf/renderer` · deployed
 
 ## Bonus features
 
-**Implemented** — the 12 short‑/long‑stay hospitalization & ED metrics with national and state averages
-(claims measures `ijh5-nb2v` + state averages `xcdc-v8bm`): correct units (% for short‑stay, rate per
-1,000 resident‑days for long‑stay), suppressed/footnoted scores rendered as “N/A”, state averages keyed to
-the facility's own state, and a non‑blocking fetch (`Promise.allSettled`) so the metrics never gate the MVP.
+**Implemented**
 
-**Planned** — Word (.docx) export, charts/data cards.
+- The 12 short‑/long‑stay hospitalization & ED metrics with national and state averages (claims measures
+  `ijh5-nb2v` + state averages `xcdc-v8bm`): correct units (% for short‑stay, rate per 1,000 resident‑days
+  for long‑stay), suppressed/footnoted scores rendered as “N/A”, state averages keyed to the facility's own
+  state, and a non‑blocking fetch (`Promise.allSettled`) so the metrics never gate the MVP.
+- **Charts / data cards** (Recharts) comparing each measure to the national and state averages, with the
+  facility bar colored green/red by whether it beats the national average (lower is better). On‑screen only;
+  the PDF stays the clean tabular snapshot.
+
+**Planned** — Word (.docx) export.
