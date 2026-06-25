@@ -59,7 +59,8 @@ CMS Provider Data Catalog API  (data.cms.gov)
 | EMR, Current Census, Type of Patient, Previous Coverage, Previous Provider Performance, Medical Coverage | Manual input |
 
 `Census Capacity` maps to the CMS *Number of Certified Beds*; `Quality of Resident Care` maps to the CMS
-*QM Rating*. (The 12 short‑/long‑stay hospitalization & ED metrics are a planned bonus — see below.)
+*QM Rating*. The 12 short‑/long‑stay hospitalization & ED metrics (with national and state averages) are
+also implemented — see Bonus features below.
 
 ## Assumptions & decisions
 
@@ -98,9 +99,11 @@ data**, so the governing concern is commercial confidentiality, addressed by arc
 
 Next.js (App Router) · React · TypeScript · `@react-pdf/renderer` · deployed on Vercel.
 
-## Roadmap (optional bonuses)
+## Bonus features
 
-- The 12 short‑/long‑stay hospitalization & ED metrics with national and state averages (claims‑based
-  measures `ijh5-nb2v` + state averages `xcdc-v8bm`), with correct unit handling (% vs. per‑1,000
-  resident‑days).
-- Word (.docx) export, charts/data cards, and expanded edge‑case handling.
+**Implemented** — the 12 short‑/long‑stay hospitalization & ED metrics with national and state averages
+(claims measures `ijh5-nb2v` + state averages `xcdc-v8bm`): correct units (% for short‑stay, rate per
+1,000 resident‑days for long‑stay), suppressed/footnoted scores rendered as “N/A”, state averages keyed to
+the facility's own state, and a non‑blocking fetch (`Promise.allSettled`) so the metrics never gate the MVP.
+
+**Planned** — Word (.docx) export, charts/data cards.
