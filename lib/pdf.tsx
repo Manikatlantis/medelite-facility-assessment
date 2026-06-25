@@ -14,7 +14,8 @@ import {
   pdf,
 } from "@react-pdf/renderer";
 import { BRAND_LINE, REPORT_TITLE } from "@/lib/branding";
-import type { ProviderInfo } from "@/lib/cms";
+import type { FacilityResponse } from "@/lib/cms";
+import { METRIC_ROWS, metricCell } from "@/lib/metrics";
 
 export type ManualInputs = {
   nameOverride: string;
@@ -72,9 +73,29 @@ export function buildFilename(name: string, ccn: string): string {
   return `Facility_Assessment_${safe}_${ccn}.pdf`;
 }
 
-function SnapshotDocument({ data, manual }: { data: ProviderInfo; manual: ManualInputs }) {
+function SnapshotDocument({ data, manual }: { data: FacilityResponse; manual: ManualInputs }) {
   const bodyName = manual.nameOverride.trim() || data.name; // override wins — BODY ONLY
   const medicareUrl = `https://www.medicare.gov/care-compare/details/nursing-home/${data.ccn}`;
+
+  const rows: [string, string][] = [
+    ["Name of Facility", bodyName],
+    ["Location", data.location],
+    ["EMR", manual.emr],
+    ["Census Capacity", data.certifiedBeds != null ? String(data.certifiedBeds) : "—"],
+    ["Current Census", manual.currentCensus],
+    ["Type of Patient", manual.patientType],
+    ["Previous Coverage from Medelite", manual.previousCoverage],
+    ["Previous Provider Performance from Medelite", manual.previousProviderPerformance],
+    ["Medical Coverage", manual.medicalCoverage],
+    ["Overall Star Rating", ratingText(data.ratings.overall)],
+    ["Health Inspection", ratingText(data.ratings.healthInspection)],
+    ["Staffing", ratingText(data.ratings.staffing)],
+    ["Quality of Resident Care", ratingText(data.ratings.qualityOfResidentCare)],
+    ...(data.metrics
+      ? METRIC_ROWS.map((m): [string, string] => [m.label, metricCell(data.metrics!, m.code, m.which)])
+      : []),
+  ];
+
   return (
     <Document title={`Facility Assessment Snapshot — ${bodyName}`} author="INFINITE — Managed by MEDELITE">
       <Page size="A4" style={styles.page}>
@@ -86,19 +107,9 @@ function SnapshotDocument({ data, manual }: { data: ProviderInfo; manual: Manual
         </View>
 
         <View style={styles.table}>
-          <Row k="Name of Facility" v={bodyName} />
-          <Row k="Location" v={data.location} />
-          <Row k="EMR" v={manual.emr} />
-          <Row k="Census Capacity" v={data.certifiedBeds != null ? String(data.certifiedBeds) : "—"} />
-          <Row k="Current Census" v={manual.currentCensus} />
-          <Row k="Type of Patient" v={manual.patientType} />
-          <Row k="Previous Coverage from Medelite" v={manual.previousCoverage} />
-          <Row k="Previous Provider Performance from Medelite" v={manual.previousProviderPerformance} />
-          <Row k="Medical Coverage" v={manual.medicalCoverage} />
-          <Row k="Overall Star Rating" v={ratingText(data.ratings.overall)} />
-          <Row k="Health Inspection" v={ratingText(data.ratings.healthInspection)} />
-          <Row k="Staffing" v={ratingText(data.ratings.staffing)} />
-          <Row k="Quality of Resident Care" v={ratingText(data.ratings.qualityOfResidentCare)} last />
+          {rows.map(([k, v], i) => (
+            <Row key={k} k={k} v={v} last={i === rows.length - 1} />
+          ))}
         </View>
 
         <View style={styles.footer}>
@@ -117,6 +128,6 @@ function SnapshotDocument({ data, manual }: { data: ProviderInfo; manual: Manual
   );
 }
 
-export async function generatePdfBlob(args: { data: ProviderInfo; manual: ManualInputs }): Promise<Blob> {
+export async function generatePdfBlob(args: { data: FacilityResponse; manual: ManualInputs }): Promise<Blob> {
   return pdf(<SnapshotDocument data={args.data} manual={args.manual} />).toBlob();
 }

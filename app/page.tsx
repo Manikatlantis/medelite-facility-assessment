@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import type { ProviderInfo } from "@/lib/cms";
+import type { FacilityResponse } from "@/lib/cms";
 import { CCN_REGEX } from "@/lib/ccn";
 import { FIELD_CAPS } from "@/lib/branding";
+import { METRIC_ROWS, metricCell } from "@/lib/metrics";
 import { BrandHeader } from "@/components/BrandHeader";
 
 type Manual = {
@@ -53,7 +54,7 @@ export default function Home() {
   const [ccnInput, setCcnInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [data, setData] = useState<ProviderInfo | null>(null);
+  const [data, setData] = useState<FacilityResponse | null>(null);
   const [manual, setManual] = useState<Manual>(EMPTY_MANUAL);
   const [pdfBusy, setPdfBusy] = useState(false);
 
@@ -78,7 +79,7 @@ export default function Home() {
         setError(body?.error ?? "Lookup failed.");
         return;
       }
-      setData(body as ProviderInfo);
+      setData(body as FacilityResponse);
     } catch {
       setData(null);
       setError("Network error — please try again.");
@@ -222,6 +223,13 @@ export default function Home() {
               <div className="row"><div className="k">Health Inspection</div><div className="v"><Stars value={data?.ratings.healthInspection ?? null} /></div></div>
               <div className="row"><div className="k">Staffing</div><div className="v"><Stars value={data?.ratings.staffing ?? null} /></div></div>
               <div className="row"><div className="k">Quality of Resident Care</div><div className="v"><Stars value={data?.ratings.qualityOfResidentCare ?? null} /></div></div>
+              {data?.metrics &&
+                METRIC_ROWS.map((m) => (
+                  <div className="row" key={`${m.code}-${m.which}`}>
+                    <div className="k">{m.label}</div>
+                    <div className="v" data-testid={`metric-${m.code}-${m.which}`}>{metricCell(data.metrics!, m.code, m.which)}</div>
+                  </div>
+                ))}
               {data?.processingDate && <div className="asof">CMS data as of {data.processingDate}. Values reflect the live CMS refresh and will differ from older samples.</div>}
             </div>
           )}

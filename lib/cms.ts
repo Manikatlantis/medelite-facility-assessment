@@ -9,10 +9,20 @@
 
 import { isValidCcn } from "./ccn";
 export { isValidCcn, CCN_REGEX } from "./ccn";
+import {
+  AVG_COLUMN,
+  METRIC_CODES,
+  type FacilityMetrics,
+  type MetricCode,
+  type MetricValues,
+} from "./metrics";
 
 const CMS_QUERY_BASE = "https://data.cms.gov/provider-data/api/1/datastore/query";
 const PROVIDER_INFO_DATASET = "4pq5-n9py"; // verified live
+const CLAIMS_DATASET = "ijh5-nb2v"; // Medicare Claims Quality Measures (bonus)
+const STATE_AVG_DATASET = "xcdc-v8bm"; // State US Averages (bonus)
 const CCN_PROPERTY = "cms_certification_number_ccn";
+const STATE_PROPERTY = "state_or_nation";
 const EQ = "=";
 const UPSTREAM_TIMEOUT_MS = 7000;
 const USER_AGENT =
@@ -78,27 +88,27 @@ function composeLocation(
 }
 
 /**
- * Fetch + normalize Provider Information for one CCN.
- * Throws on upstream/transport failure (caller maps to a generic 502). Returns {ok:false} for a clean
- * "no facility found" (CMS returns results:[] — HTTP 200 — for an unknown but well-formed CCN).
+ * Low-level datastore query. SECURITY: datasetId and each condition's property/operator are caller-supplied
+ * CONSTANTS only; the single dynamic value is encoded by URLSearchParams and never enters the URL path.
  */
-export async function fetchProviderInfo(ccn: string): Promise<ProviderLookup> {
-  if (!isValidCcn(ccn)) throw new Error("invalid_ccn"); // defensive; the route validates first
-
-  // Build the request with URLSearchParams so the value is encoded by the serializer, not hand-concatenated.
+async function cmsQuery(
+  datasetId: string,
+  conditions: { property: string; value: string; operator: string }[],
+  limit: number,
+): Promise<Record<string, unknown>[]> {
   const params = new URLSearchParams();
-  params.append("conditions[0][property]", CCN_PROPERTY);
-  params.append("conditions[0][value]", ccn); // the ONLY dynamic value
-  params.append("conditions[0][operator]", EQ);
-  params.append("limit", "1");
+  conditions.forEach((c, i) => {
+    params.append(`conditions[${i}][property]`, c.property);
+    params.append(`conditions[${i}][value]`, c.value);
+    params.append(`conditions[${i}][operator]`, c.operator);
+  });
+  params.append("limit", String(limit));
 
-  const url = new URL(`${PROVIDER_INFO_DATASET}/0`, `${CMS_QUERY_BASE}/`); // fixed path; CCN never enters it
+  const url = new URL(`${datasetId}/0`, `${CMS_QUERY_BASE}/`); // fixed path; values only via query string
   url.search = params.toString();
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS);
-
-  let json: unknown;
   try {
     const res = await fetch(url, {
       method: "GET",
@@ -107,19 +117,30 @@ export async function fetchProviderInfo(ccn: string): Promise<ProviderLookup> {
       cache: "no-store",
     });
     if (!res.ok) throw new Error(`upstream_status_${res.status}`);
-    json = await res.json();
+    const json = (await res.json()) as { results?: unknown };
+    return Array.isArray(json.results) ? (json.results as Record<string, unknown>[]) : [];
   } finally {
     clearTimeout(timer);
   }
+}
 
-  const results =
-    json && typeof json === "object" && Array.isArray((json as { results?: unknown }).results)
-      ? ((json as { results: unknown[] }).results as unknown[])
-      : [];
+/**
+ * Fetch + normalize Provider Information for one CCN.
+ * Throws on upstream/transport failure (caller maps to a generic 502). Returns {ok:false} for a clean
+ * "no facility found" (CMS returns results:[] — HTTP 200 — for an unknown but well-formed CCN).
+ */
+export async function fetchProviderInfo(ccn: string): Promise<ProviderLookup> {
+  if (!isValidCcn(ccn)) throw new Error("invalid_ccn"); // defensive; the route validates first
+
+  const results = await cmsQuery(
+    PROVIDER_INFO_DATASET,
+    [{ property: CCN_PROPERTY, value: ccn, operator: EQ }],
+    1,
+  );
   if (results.length === 0) return { ok: false, reason: "not_found" };
 
   // Read fields by LITERAL key only — never spread/iterate upstream keys (prototype-pollution guard).
-  const row = results[0] as Record<string, unknown>;
+  const row = results[0];
   const address = str(row.provider_address);
   const city = str(row.citytown);
   const state = str(row.state);
@@ -144,4 +165,63 @@ export async function fetchProviderInfo(ccn: string): Promise<ProviderLookup> {
     processingDate: str(row.processing_date),
   };
   return { ok: true, data };
+}
+
+// ---------------- Bonus: claims-based hospitalization / ED metrics ----------------
+
+export interface FacilityResponse extends ProviderInfo {
+  metrics: FacilityMetrics | null;
+}
+
+type ClaimsByCode = Partial<Record<MetricCode, { value: number | null; footnote: string | null }>>;
+type AvgByCode = Partial<Record<MetricCode, number | null>>;
+
+/** Facility's 4 claims measures (risk-adjusted score + suppression footnote), keyed by measure_code. */
+async function fetchClaims(ccn: string): Promise<ClaimsByCode> {
+  const rows = await cmsQuery(CLAIMS_DATASET, [{ property: CCN_PROPERTY, value: ccn, operator: EQ }], 10);
+  const out: ClaimsByCode = {};
+  for (const row of rows) {
+    const code = str(row.measure_code) as MetricCode | null;
+    if (code && (METRIC_CODES as string[]).includes(code)) {
+      out[code] = { value: num(row.adjusted_score), footnote: str(row.footnote_for_score) };
+    }
+  }
+  return out;
+}
+
+/** National (NATION row) + the facility's state row from State US Averages, by measure code. */
+async function fetchStateAverages(state: string): Promise<{ national: AvgByCode; state: AvgByCode }> {
+  const rows = await cmsQuery(STATE_AVG_DATASET, [], 60); // small table (~54 rows): fetch once, pick two
+  const pick = (sel: string): AvgByCode => {
+    const r = rows.find((x) => str(x[STATE_PROPERTY])?.toUpperCase() === sel);
+    const vals: AvgByCode = {};
+    if (r) for (const code of METRIC_CODES) vals[code] = num(r[AVG_COLUMN[code]]); // missing column -> null
+    return vals;
+  };
+  return { national: pick("NATION"), state: pick(state.toUpperCase()) };
+}
+
+/**
+ * Assemble the 12 metrics. BONUS — wrapped so a failure never blocks the MVP response. Uses allSettled so a
+ * missing/slow claims OR averages dataset degrades gracefully (the other still renders).
+ */
+export async function fetchFacilityMetrics(ccn: string, state: string | null): Promise<FacilityMetrics | null> {
+  const [claimsR, avgR] = await Promise.allSettled([
+    fetchClaims(ccn),
+    state ? fetchStateAverages(state) : Promise.resolve(null),
+  ]);
+  const claims = claimsR.status === "fulfilled" ? claimsR.value : null;
+  const avgs = avgR.status === "fulfilled" ? avgR.value : null;
+  if (!claims && !avgs) return null;
+
+  const values = {} as Record<MetricCode, MetricValues>;
+  for (const code of METRIC_CODES) {
+    values[code] = {
+      facility: claims?.[code]?.value ?? null,
+      national: avgs?.national?.[code] ?? null,
+      state: avgs?.state?.[code] ?? null,
+      footnote: claims?.[code]?.footnote ?? null,
+    };
+  }
+  return { stateCode: state, values };
 }

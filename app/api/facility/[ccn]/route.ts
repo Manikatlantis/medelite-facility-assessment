@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { isValidCcn, fetchProviderInfo } from "@/lib/cms";
+import { isValidCcn, fetchProviderInfo, fetchFacilityMetrics } from "@/lib/cms";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic"; // caching is controlled explicitly per-response below
@@ -46,7 +46,9 @@ export async function GET(
     if (!result.ok) {
       return reply({ error: "No facility found for that CCN." }, 404, "no-store");
     }
-    return reply(result.data, 200, "long");
+    // Bonus: the 12 hospitalization/ED metrics. Never let this block the MVP response.
+    const metrics = await fetchFacilityMetrics(ccn, result.data.state).catch(() => null);
+    return reply({ ...result.data, metrics }, 200, "long");
   } catch (err) {
     // Log details SERVER-SIDE only; never leak the upstream URL/status/stack to the client.
     console.error("[facility lookup] failed", {
