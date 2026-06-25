@@ -6,6 +6,7 @@ import { CCN_REGEX } from "@/lib/ccn";
 import { FIELD_CAPS } from "@/lib/branding";
 import { METRIC_ROWS, metricCell } from "@/lib/metrics";
 import { BrandHeader } from "@/components/BrandHeader";
+import { MetricsCharts } from "@/components/MetricsCharts";
 
 type Manual = {
   nameOverride: string;
@@ -235,6 +236,8 @@ export default function Home() {
           )}
         </section>
       </div>
+
+      {data?.metrics && <MetricsCharts metrics={data.metrics} />}
     </main>
   );
 }
