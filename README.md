@@ -4,7 +4,7 @@ A lightweight micro-app for evaluating skilled nursing facilities. Enter a facil
 Certification Number), and the app pulls public CMS data, combines it with manual operational inputs, and
 produces a polished, print-ready **PDF report** branded for the *INFINITE — Managed by MEDELITE* platform.
 
-- **Live app:** _<add Vercel URL after deploy>_
+- **Live app:** https://medelite-facility-assessment-eight.vercel.app
 - **Test facility:** CCN `686123` (Kendall Lakes Healthcare and Rehab Center, Miami FL)
 
 ---
