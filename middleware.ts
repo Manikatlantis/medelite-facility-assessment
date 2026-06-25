@@ -25,6 +25,9 @@ export function middleware(req: NextRequest) {
   const csp = [
     "default-src 'self'",
     `script-src ${scriptSrc}`,
+    // react-pdf decodes the embedded logo PNG in a Web Worker created from a blob: URL the page itself
+    // generates. Scope it to worker-src (not script-src) so it can't broaden general script execution.
+    "worker-src 'self' blob:",
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob:",
     "font-src 'self' data:",

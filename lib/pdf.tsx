@@ -9,11 +9,13 @@ import {
   Page,
   View,
   Text,
+  Image,
   Link,
   StyleSheet,
   pdf,
 } from "@react-pdf/renderer";
-import { BRAND_LINE, REPORT_TITLE } from "@/lib/branding";
+import { REPORT_TITLE } from "@/lib/branding";
+import { LOGO_DATA_URI } from "@/lib/logo";
 import type { FacilityResponse } from "@/lib/cms";
 import { type ManualInputs, bodyNameOf, buildReportRows, medicareUrl } from "@/lib/report";
 
@@ -29,9 +31,14 @@ const C = {
 
 const styles = StyleSheet.create({
   page: { paddingVertical: 34, paddingHorizontal: 38, fontFamily: "Helvetica", color: C.ink, fontSize: 9 },
-  banner: { textAlign: "center", marginBottom: 18 },
-  brandLine: { fontSize: 17, fontFamily: "Helvetica-Bold", color: C.brand, letterSpacing: 0.5 },
-  title: { fontSize: 10, fontFamily: "Helvetica-Bold", letterSpacing: 2, marginTop: 6, color: C.ink },
+  banner: { marginBottom: 18, alignItems: "center" },
+  lockup: { flexDirection: "row", alignItems: "center", marginBottom: 8 },
+  icon: { width: 64, height: 36, marginRight: 9 },
+  infinite: { fontSize: 21, fontFamily: "Helvetica-Bold", color: "#9b1fb0", letterSpacing: 1 },
+  managed: { fontSize: 8.5, color: "#3f8a9d", marginTop: 1 },
+  med: { color: "#6b7280", fontFamily: "Helvetica-Bold" },
+  elite: { color: "#1d4ed8", fontFamily: "Helvetica-Bold" },
+  title: { fontSize: 10, fontFamily: "Helvetica-Bold", letterSpacing: 2, marginTop: 2, color: C.ink },
   state: { fontSize: 10, fontFamily: "Helvetica-Bold", marginTop: 3, color: C.muted },
   table: { borderWidth: 1, borderColor: C.line, borderRadius: 2 },
   row: { flexDirection: "row", borderBottomWidth: 1, borderBottomColor: C.rule },
@@ -61,9 +68,19 @@ function SnapshotDocument({ data, manual }: { data: FacilityResponse; manual: Ma
   return (
     <Document title={`Facility Assessment Snapshot — ${bodyName}`} author="INFINITE — Managed by MEDELITE">
       <Page size="A4" style={styles.page}>
-        {/* Banner — INFINITE is fixed; only the state is dynamic. Never the facility name. */}
+        {/* Banner — the INFINITE logo lockup is fixed; only the state is dynamic. Never the facility name. */}
         <View style={styles.banner}>
-          <Text style={styles.brandLine}>{BRAND_LINE}</Text>
+          <View style={styles.lockup}>
+            {/* eslint-disable-next-line jsx-a11y/alt-text */}
+            <Image src={LOGO_DATA_URI} style={styles.icon} />
+            <View>
+              <Text style={styles.infinite}>INFINITE</Text>
+              <Text style={styles.managed}>
+                Managed by <Text style={styles.med}>MED</Text>
+                <Text style={styles.elite}>ELITE</Text>
+              </Text>
+            </View>
+          </View>
           <Text style={styles.title}>{REPORT_TITLE}</Text>
           <Text style={styles.state}>{data.state ?? " "}</Text>
         </View>

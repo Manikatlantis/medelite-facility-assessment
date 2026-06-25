@@ -17,13 +17,21 @@ import {
   ExternalHyperlink,
   BorderStyle,
   TableLayoutType,
+  ImageRun,
 } from "docx";
-import { BRAND_LINE, REPORT_TITLE } from "./branding";
+import { REPORT_TITLE } from "./branding";
+import { LOGO_BASE64 } from "./logo";
 import { type ManualInputs, bodyNameOf, buildReportRows, medicareUrl } from "./report";
 import type { FacilityResponse } from "./cms";
 
+function b64ToBytes(b64: string): Uint8Array {
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+}
+
 const INK = "0F172A";
-const BRAND = "312E81";
 const MUTED = "64748B";
 const SOFT = "F1F5F9";
 const LINE = "CBD5E1";
@@ -78,8 +86,22 @@ export async function generateDocxBlob(args: { data: FacilityResponse; manual: M
           },
         },
         children: [
-          // Banner — INFINITE is fixed; only the state is dynamic. Never the facility name.
-          center([new TextRun({ text: BRAND_LINE, bold: true, size: 32, color: BRAND })], 60),
+          // Banner — the INFINITE logo lockup is fixed; only the state is dynamic. Never the facility name.
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 30 },
+            children: [new ImageRun({ data: b64ToBytes(LOGO_BASE64), type: "png", transformation: { width: 96, height: 54 } })],
+          }),
+          center([new TextRun({ text: "INFINITE", bold: true, size: 40, color: "9B1FB0", characterSpacing: 20 })], 0),
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 140 },
+            children: [
+              new TextRun({ text: "Managed by ", size: 18, color: "3F8A9D" }),
+              new TextRun({ text: "MED", bold: true, size: 18, color: "6B7280" }),
+              new TextRun({ text: "ELITE", bold: true, size: 18, color: "1D4ED8" }),
+            ],
+          }),
           center([new TextRun({ text: REPORT_TITLE, bold: true, size: 20, color: INK, characterSpacing: 40 })], 40),
           center([new TextRun({ text: data.state ?? " ", bold: true, size: 20, color: MUTED })], 160),
           table,
