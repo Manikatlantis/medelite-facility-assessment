@@ -15,17 +15,7 @@ import {
 } from "@react-pdf/renderer";
 import { BRAND_LINE, REPORT_TITLE } from "@/lib/branding";
 import type { FacilityResponse } from "@/lib/cms";
-import { METRIC_ROWS, metricCell } from "@/lib/metrics";
-
-export type ManualInputs = {
-  nameOverride: string;
-  emr: string;
-  currentCensus: string;
-  patientType: string;
-  previousCoverage: string;
-  previousProviderPerformance: string;
-  medicalCoverage: string;
-};
+import { type ManualInputs, bodyNameOf, buildReportRows, medicareUrl } from "@/lib/report";
 
 const C = {
   ink: "#0f172a",
@@ -54,10 +44,6 @@ const styles = StyleSheet.create({
   asof: { fontSize: 7.5, color: C.muted, marginTop: 8 },
 });
 
-function ratingText(v: number | null): string {
-  return v == null ? "Not Rated" : `${v} / 5`;
-}
-
 function Row({ k, v, last }: { k: string; v: string; last?: boolean }) {
   const empty = v === "" || v === "—";
   return (
@@ -68,33 +54,9 @@ function Row({ k, v, last }: { k: string; v: string; last?: boolean }) {
   );
 }
 
-export function buildFilename(name: string, ccn: string): string {
-  const safe = (name || "Facility").replace(/[^A-Za-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 60);
-  return `Facility_Assessment_${safe}_${ccn}.pdf`;
-}
-
 function SnapshotDocument({ data, manual }: { data: FacilityResponse; manual: ManualInputs }) {
-  const bodyName = manual.nameOverride.trim() || data.name; // override wins — BODY ONLY
-  const medicareUrl = `https://www.medicare.gov/care-compare/details/nursing-home/${data.ccn}`;
-
-  const rows: [string, string][] = [
-    ["Name of Facility", bodyName],
-    ["Location", data.location],
-    ["EMR", manual.emr],
-    ["Census Capacity", data.certifiedBeds != null ? String(data.certifiedBeds) : "—"],
-    ["Current Census", manual.currentCensus],
-    ["Type of Patient", manual.patientType],
-    ["Previous Coverage from Medelite", manual.previousCoverage],
-    ["Previous Provider Performance from Medelite", manual.previousProviderPerformance],
-    ["Medical Coverage", manual.medicalCoverage],
-    ["Overall Star Rating", ratingText(data.ratings.overall)],
-    ["Health Inspection", ratingText(data.ratings.healthInspection)],
-    ["Staffing", ratingText(data.ratings.staffing)],
-    ["Quality of Resident Care", ratingText(data.ratings.qualityOfResidentCare)],
-    ...(data.metrics
-      ? METRIC_ROWS.map((m): [string, string] => [m.label, metricCell(data.metrics!, m.code, m.which)])
-      : []),
-  ];
+  const bodyName = bodyNameOf(data, manual);
+  const rows = buildReportRows(data, manual);
 
   return (
     <Document title={`Facility Assessment Snapshot — ${bodyName}`} author="INFINITE — Managed by MEDELITE">
@@ -113,7 +75,7 @@ function SnapshotDocument({ data, manual }: { data: FacilityResponse; manual: Ma
         </View>
 
         <View style={styles.footer}>
-          <Link style={styles.link} src={medicareUrl}>
+          <Link style={styles.link} src={medicareUrl(data.ccn)}>
             View this facility&#39;s official profile on Medicare Care Compare
           </Link>
           {data.processingDate ? (

@@ -51,6 +51,17 @@ function Stars({ value }: { value: number | null }) {
   );
 }
 
+function triggerDownload(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 export default function Home() {
   const [ccnInput, setCcnInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -58,6 +69,7 @@ export default function Home() {
   const [data, setData] = useState<FacilityResponse | null>(null);
   const [manual, setManual] = useState<Manual>(EMPTY_MANUAL);
   const [pdfBusy, setPdfBusy] = useState(false);
+  const [docxBusy, setDocxBusy] = useState(false);
 
   function setField<K extends keyof Manual>(key: K, raw: string) {
     const capped = raw.slice(0, CAPS[key]) as Manual[K];
@@ -94,21 +106,29 @@ export default function Home() {
     setError(null);
     setPdfBusy(true);
     try {
-      // Lazy-load the (heavy) PDF module only on demand; it runs 100% in the browser.
-      const { generatePdfBlob, buildFilename } = await import("@/lib/pdf");
+      // Lazy-load the (heavy) export modules only on demand; they run 100% in the browser.
+      const [{ generatePdfBlob }, { buildFilename }] = await Promise.all([import("@/lib/pdf"), import("@/lib/report")]);
       const blob = await generatePdfBlob({ data, manual });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = buildFilename(manual.nameOverride.trim() || data.name, data.ccn);
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
+      triggerDownload(blob, buildFilename(manual.nameOverride.trim() || data.name, data.ccn, "pdf"));
     } catch {
       setError("Could not generate the PDF. Please try again.");
     } finally {
       setPdfBusy(false);
+    }
+  }
+
+  async function downloadDocx() {
+    if (!data) return;
+    setError(null);
+    setDocxBusy(true);
+    try {
+      const [{ generateDocxBlob }, { buildFilename }] = await Promise.all([import("@/lib/docx"), import("@/lib/report")]);
+      const blob = await generateDocxBlob({ data, manual });
+      triggerDownload(blob, buildFilename(manual.nameOverride.trim() || data.name, data.ccn, "docx"));
+    } catch {
+      setError("Could not generate the Word document. Please try again.");
+    } finally {
+      setDocxBusy(false);
     }
   }
 
@@ -203,9 +223,14 @@ export default function Home() {
         <section className="card">
           <div className="preview-head">
             <h2 style={{ margin: 0 }}>Report Preview</h2>
-            <button id="download" className="primary" onClick={downloadPdf} disabled={!data || pdfBusy}>
-              {pdfBusy ? "Generating…" : "Download PDF"}
-            </button>
+            <div className="dl-buttons">
+              <button id="download" className="primary" onClick={downloadPdf} disabled={!data || pdfBusy || docxBusy}>
+                {pdfBusy ? "Generating…" : "Download PDF"}
+              </button>
+              <button id="download-docx" className="secondary" onClick={downloadDocx} disabled={!data || pdfBusy || docxBusy}>
+                {docxBusy ? "Generating…" : "Download Word"}
+              </button>
+            </div>
           </div>
           {!data && !manual.nameOverride ? (
             <div className="placeholder">Look up a CCN to populate the snapshot.</div>
